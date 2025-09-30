@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>PDF Viewer (по ширине мобильного экрана)</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      overflow-x: hidden;
+    }
+    #viewer {
+      width: 100vw;   /* всегда по ширине экрана */
+      margin: 0;
+      padding: 0;
+    }
+    .page { width: 100vw; margin: 0 auto; }
+    canvas { width: 100% !important; height: auto !important; display:block; }
+    .loading { padding: 16px; text-align:center; opacity:.8; }
+  </style>
+  <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  </script>
+</head>
+<body>
+  <div id="viewer"><div class="loading" id="loading">Загружаю…</div></div>
+  <script>
+    const url = "123mobile.pdf"; // рядом с index.html
+    const DPR = Math.min(window.devicePixelRatio || 1, 2); // баланс чёткости/веса
+
+    function renderPageToWidth(page, cssWidth) {
+      const baseVp = page.getViewport({ scale: 1 });
+      const scale = cssWidth / baseVp.width;               // подгон под CSS-ширину
+      const cssHeight = baseVp.height * scale;
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      // реальное число пикселей для отрисовки
+      canvas.width  = Math.round(cssWidth  * DPR);
+      canvas.height = Math.round(cssHeight * DPR);
+      canvas.style.width = cssWidth + 'px';
+      canvas.style.height = cssHeight + 'px';
+
+      const wrap = document.createElement('div');
+      wrap.className = 'page';
+      wrap.appendChild(canvas);
+      document.getElementById('viewer').appendChild(wrap);
+
+      const renderVp = page.getViewport({ scale: scale * DPR });
+      return page.render({ canvasContext: ctx, viewport: renderVp }).promise;
+    }
+
+    (async () => {
+      const containerWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+      const loading = document.getElementById('loading');
+      try {
+        const pdf = await pdfjsLib.getDocument(url).promise;
+        if (loading) loading.remove();
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const page = await pdf.getPage(p);
+          await renderPageToWidth(page, containerWidth);
+        }
+      } catch (e) {
+        if (loading) loading.textContent = 'Ошибка: ' + e.message;
+      }
+    })();
+  </script>
+</body>
+</html>
